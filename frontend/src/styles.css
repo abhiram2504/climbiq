@@ -1,0 +1,119 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+:root {
+  color-scheme: dark;
+  font-family: "Manrope Variable", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  background: #0d0f0f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 80% 0%, rgba(200, 255, 61, 0.035), transparent 28rem),
+    #0d0f0f;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #c8ff3d;
+  outline-offset: 2px;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-panel shadow-panel;
+  }
+
+  .eyebrow {
+    @apply text-[10px] font-extrabold uppercase tracking-[0.18em] text-mist;
+  }
+
+  .nav-item {
+    @apply flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-mist transition hover:bg-white/[0.035] hover:text-chalk disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .nav-item-active {
+    @apply bg-white/[0.055] text-chalk;
+  }
+
+  .nav-item-active svg {
+    @apply text-lime;
+  }
+
+  .icon-button {
+    @apply grid h-9 w-9 place-items-center rounded-lg border border-line text-mist transition hover:border-mist hover:text-chalk;
+  }
+
+  .mobile-nav-item {
+    @apply flex items-center justify-center gap-1.5 rounded-lg border border-line px-2 py-2.5 text-xs font-bold text-mist transition hover:border-mist hover:text-chalk;
+  }
+
+  .drop-zone {
+    @apply flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-line bg-white/[0.015] px-6 text-center transition;
+  }
+
+  .drop-zone-active {
+    @apply border-lime bg-lime/[0.035];
+  }
+
+  .button-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-lime px-4 py-3 text-sm font-extrabold text-ink transition hover:bg-[#d8ff78] disabled:cursor-wait disabled:opacity-60;
+  }
+
+  .button-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-line bg-white/[0.025] px-4 py-2.5 text-xs font-bold text-chalk transition hover:border-mist hover:bg-white/[0.05];
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-line bg-ink px-3.5 py-3 text-sm text-chalk placeholder:text-mist/60;
+  }
+
+  .status-pill {
+    @apply inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider;
+  }
+
+  .status-neutral {
+    @apply border-white/10 bg-white/[0.035] text-mist;
+  }
+
+  .status-working {
+    @apply border-amber-300/15 bg-amber-300/[0.06] text-amber-200;
+  }
+
+  .status-working svg {
+    @apply animate-spin;
+  }
+
+  .status-complete {
+    @apply border-lime/20 bg-lime/[0.07] text-lime;
+  }
+
+  .status-error {
+    @apply border-red-300/15 bg-red-300/[0.06] text-red-200;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
