@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { listSessions, listVideos, uploadVideo } from "../services/api";
+import { listSessions, listVideos, processVideo, uploadVideo } from "../services/api";
 import type { ClimbingSession, VideoAttempt } from "../types/api";
 
 export function useClimbData() {
@@ -38,5 +38,11 @@ export function useClimbData() {
     [refresh],
   );
 
-  return { videos, sessions, loading, error, refresh, addVideo };
+  const retryVideo = useCallback(async (videoId: string) => {
+    const updated = await processVideo(videoId);
+    setVideos((current) => current.map((video) => (video.id === videoId ? updated : video)));
+    return updated;
+  }, []);
+
+  return { videos, sessions, loading, error, refresh, addVideo, retryVideo };
 }

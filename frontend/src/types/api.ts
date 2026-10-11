@@ -6,8 +6,13 @@ export interface VideoAttempt {
   original_filename: string;
   content_type: string;
   size_bytes: number;
+  duration_ms: number | null;
+  width: number | null;
+  height: number | null;
+  source_fps: number | null;
   status: ProcessingStatus;
   error_message: string | null;
+  progress_percent: number | null;
   created_at: string;
   updated_at: string;
   stream_url: string;

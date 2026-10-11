@@ -31,3 +31,7 @@ export async function uploadVideo(file: File, sessionTitle?: string): Promise<Vi
   if (sessionTitle?.trim()) body.append("session_title", sessionTitle.trim());
   return request<VideoAttempt>("/videos/upload", { method: "POST", body });
 }
+
+export function processVideo(videoId: string): Promise<VideoAttempt> {
+  return request<VideoAttempt>(`/videos/${videoId}/process`, { method: "POST" });
+}

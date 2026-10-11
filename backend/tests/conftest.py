@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,10 +14,33 @@ from app.core.config import Settings, get_settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+from app.services.processing_jobs import get_processing_dispatcher
+
+
+class StubProcessingDispatcher:
+    def __init__(self) -> None:
+        self.enqueued: list[tuple[UUID, UUID]] = []
+
+    def enqueue(self, video_id: UUID, job_id: UUID, settings: Settings) -> None:
+        self.enqueued.append((video_id, job_id))
+
+    def recover(self, settings: Settings) -> None:
+        return None
+
+    def shutdown(self) -> None:
+        return None
 
 
 @pytest.fixture
-def client(tmp_path: Path) -> Generator[TestClient, None, None]:
+def dispatcher() -> StubProcessingDispatcher:
+    return StubProcessingDispatcher()
+
+
+@pytest.fixture
+def client(
+    tmp_path: Path,
+    dispatcher: StubProcessingDispatcher,
+) -> Generator[TestClient, None, None]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -36,6 +60,7 @@ def client(tmp_path: Path) -> Generator[TestClient, None, None]:
 
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_processing_dispatcher] = lambda: dispatcher
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

@@ -5,7 +5,20 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -47,6 +60,10 @@ class VideoUpload(Base):
     annotated_storage_key: Mapped[str | None] = mapped_column(String(500), unique=True)
     content_type: Mapped[str] = mapped_column(String(100))
     size_bytes: Mapped[int] = mapped_column(Integer)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
+    source_fps: Mapped[float | None] = mapped_column(Float)
     status: Mapped[ProcessingStatus] = mapped_column(
         Enum(ProcessingStatus, native_enum=False, length=32),
         default=ProcessingStatus.uploaded,
@@ -87,6 +104,10 @@ class ProcessingJob(Base):
     )
     task_name: Mapped[str] = mapped_column(String(100), default="pose_analysis")
     attempts: Mapped[int] = mapped_column(Integer, default=0)
+    progress_current: Mapped[int] = mapped_column(Integer, default=0)
+    progress_total: Mapped[int] = mapped_column(Integer, default=0)
+    model_version: Mapped[str | None] = mapped_column(String(100))
+    configuration_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     error_message: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -100,6 +121,9 @@ class PoseLandmark(Base):
     __table_args__ = (
         Index("ix_pose_video_frame", "video_id", "frame_index"),
         Index("ix_pose_video_timestamp", "video_id", "timestamp_ms"),
+        UniqueConstraint(
+            "video_id", "frame_index", "landmark_name", name="uq_pose_video_frame_landmark"
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -107,8 +131,9 @@ class PoseLandmark(Base):
     frame_index: Mapped[int] = mapped_column(Integer)
     timestamp_ms: Mapped[int] = mapped_column(Integer)
     landmark_name: Mapped[str] = mapped_column(String(50))
-    x: Mapped[float] = mapped_column(Float)
-    y: Mapped[float] = mapped_column(Float)
+    detected: Mapped[bool] = mapped_column(Boolean, default=True)
+    x: Mapped[float | None] = mapped_column(Float)
+    y: Mapped[float | None] = mapped_column(Float)
     z: Mapped[float | None] = mapped_column(Float)
     visibility: Mapped[float | None] = mapped_column(Float)
     presence: Mapped[float | None] = mapped_column(Float)

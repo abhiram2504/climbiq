@@ -10,7 +10,7 @@ import { useClimbData } from "./hooks/useClimbData";
 import type { VideoAttempt } from "./types/api";
 
 export default function App() {
-  const { videos, sessions, loading, error, refresh, addVideo } = useClimbData();
+  const { videos, sessions, loading, error, refresh, addVideo, retryVideo } = useClimbData();
   const [selected, setSelected] = useState<VideoAttempt | undefined>();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -18,13 +18,18 @@ export default function App() {
     if (!selected && videos.length > 0) setSelected(videos[0]);
     if (selected) {
       const updated = videos.find((video) => video.id === selected.id);
-      if (updated && updated.updated_at !== selected.updated_at) setSelected(updated);
+      if (updated && updated !== selected) setSelected(updated);
     }
   }, [selected, videos]);
 
   async function handleUpload(file: File, title?: string) {
     const created = await addVideo(file, title);
     setSelected(created);
+  }
+
+  async function handleRetry(videoId: string) {
+    const updated = await retryVideo(videoId);
+    setSelected(updated);
   }
 
   return (
@@ -69,7 +74,7 @@ export default function App() {
             <div>
               <p className="eyebrow text-lime">Technique workspace</p>
               <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.055em] text-chalk sm:text-4xl">Read the movement.</h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-mist">Build a clear record of each attempt now. Measured pose and movement insights arrive in the next phases.</p>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-mist">Upload an attempt to extract body landmarks and review the movement with a measured pose overlay.</p>
             </div>
             <p className="hidden text-right text-xs leading-5 text-mist md:block">Single-user MVP<br />Data stays local</p>
           </div>
@@ -87,7 +92,7 @@ export default function App() {
             <StatCard
               label="Analyzed"
               value={videos.filter((video) => video.status === "completed").length}
-              detail="Pipeline activates in Phase 2"
+              detail="Pose overlays completed"
               icon={Activity}
             />
           </div>
@@ -97,7 +102,7 @@ export default function App() {
               <div id="upload" className="scroll-mt-20"><UploadPanel onUpload={handleUpload} /></div>
               <div id="sessions" className="scroll-mt-20"><AttemptList videos={videos} selectedId={selected?.id} onSelect={setSelected} /></div>
             </div>
-            <VideoWorkspace video={selected} />
+            <VideoWorkspace video={selected} onRetry={handleRetry} />
           </div>
         </main>
       </div>

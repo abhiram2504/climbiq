@@ -18,7 +18,8 @@ def test_upload_list_status_analysis_and_stream(client: TestClient) -> None:
     assert upload.status_code == 201
     created = upload.json()
     assert created["original_filename"] == "send-7.mp4"
-    assert created["status"] == "uploaded"
+    assert created["status"] == "queued"
+    assert created["progress_percent"] is None
     assert created["stream_url"].endswith("/stream")
 
     video_id = created["id"]
@@ -28,7 +29,8 @@ def test_upload_list_status_analysis_and_stream(client: TestClient) -> None:
 
     status = client.get(f"/api/videos/{video_id}/status")
     assert status.status_code == 200
-    assert status.json()["status"] == "uploaded"
+    assert status.json()["status"] == "queued"
+    assert status.json()["progress_current"] == 0
 
     analysis = client.get(f"/api/videos/{video_id}/analysis")
     assert analysis.status_code == 200
@@ -43,6 +45,9 @@ def test_upload_list_status_analysis_and_stream(client: TestClient) -> None:
     assert sessions.status_code == 200
     assert sessions.json()["items"][0]["title"] == "Saturday project session"
     assert sessions.json()["items"][0]["attempt_count"] == 1
+
+    duplicate = client.post(f"/api/videos/{video_id}/process")
+    assert duplicate.status_code == 409
 
 
 def test_upload_rejects_extension_and_invalid_container(client: TestClient) -> None:

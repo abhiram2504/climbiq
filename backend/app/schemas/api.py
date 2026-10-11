@@ -23,8 +23,13 @@ class VideoResponse(BaseModel):
     original_filename: str
     content_type: str
     size_bytes: int
+    duration_ms: int | None
+    width: int | None
+    height: int | None
+    source_fps: float | None
     status: ProcessingStatus
     error_message: str | None
+    progress_percent: int | None = None
     created_at: datetime
     updated_at: datetime
     stream_url: str = ""
@@ -42,6 +47,9 @@ class VideoStatusResponse(BaseModel):
     video_id: UUID
     status: ProcessingStatus
     error_message: str | None
+    progress_current: int
+    progress_total: int
+    progress_percent: int | None
     updated_at: datetime
 
 

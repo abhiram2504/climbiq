@@ -131,7 +131,7 @@ export function UploadPanel({ onUpload }: UploadPanelProps) {
             </label>
             <button type="button" className="button-primary w-full" onClick={() => void submit()} disabled={uploading}>
               {uploading ? <LoaderCircle size={17} className="animate-spin" /> : <UploadCloud size={17} />}
-              {uploading ? "Uploading…" : "Upload attempt"}
+              {uploading ? "Uploading…" : "Upload & analyze"}
             </button>
           </div>
         )}

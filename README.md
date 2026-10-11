@@ -1,8 +1,8 @@
 # ClimbIQ
 
-ClimbIQ is a local-first indoor bouldering analysis application. Phase 1 provides the production-shaped foundation: safe video uploads, PostgreSQL persistence, attempt history, status reporting, video playback, a responsive React dashboard, database migrations, and automated tests.
+ClimbIQ is a local-first indoor bouldering analysis application. Phase 2 accepts climbing videos, runs MediaPipe Pose Landmarker locally, persists timestamped body landmarks, and produces an annotated review video alongside the original attempt.
 
-> **Phase boundary:** pose estimation, annotated output, movement metrics, and technique observations are intentionally not implemented yet. The API models and response contracts are ready for those Phase 2 and 3 features, and the UI labels them as pending rather than showing invented results.
+> **Phase boundary:** Phase 2 measures and visualizes pose. Joint-angle metrics, movement segmentation, and evidence-based technique observations remain Phase 3 work; the app does not invent technique verdicts from raw landmarks.
 
 ## Architecture
 
@@ -11,11 +11,13 @@ Browser (React + TypeScript + Vite + Tailwind)
               │ /api
               ▼
 FastAPI ── SQLAlchemy/Alembic ── PostgreSQL
-   │
-   └── UUID-named video files in data/videos/
+   │                  │
+   │                  └── processing jobs + 33-landmark samples
+   └── local pose executor ── MediaPipe + OpenCV + FFmpeg
+                            └── original and annotated video files
 ```
 
-Videos are stored outside PostgreSQL. Database rows keep metadata and a storage key, so local storage can later be replaced by object storage without changing the API contract. The analysis-oriented tables are included in the initial migration but remain empty in Phase 1.
+Videos are stored outside PostgreSQL. Database rows keep metadata and storage keys, while normalized landmark samples are stored in PostgreSQL. Processing uses a single-worker local executor for the MVP and preserves a queue boundary that can be replaced by Celery/Redis in Phase 4.
 
 ## Repository layout
 
@@ -34,9 +36,9 @@ climbiq/
 ## Prerequisites
 
 - Docker Desktop with Docker Compose (recommended), or
-- Python 3.12, Node.js 22.12+, npm, and a PostgreSQL 16 instance
+- Python 3.12, Node.js 22.12+, npm, FFmpeg, and a PostgreSQL 16 instance
 
-No NVIDIA GPU or cloud account is required for Phase 1.
+No NVIDIA GPU or cloud account is required. Pose inference runs on the backend CPU.
 
 ## Run with Docker (recommended)
 
@@ -71,6 +73,9 @@ cd backend
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
+cd ..
+python backend/.venv/bin/python scripts/download_pose_model.py
+cd backend
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
@@ -97,36 +102,40 @@ npm run typecheck
 npm run build
 ```
 
-Backend tests use a temporary SQLite database and temporary media directory, so they do not modify development data or require PostgreSQL. PostgreSQL behavior is covered by the same SQLAlchemy models and is exercised when the Docker stack starts and runs its migration.
+Backend tests use a temporary SQLite database and temporary media directory, so they do not modify development data or require PostgreSQL. The computer-vision test uses a generated video, a deterministic fake detector, and the real FFmpeg H.264 output path; no private climbing footage is committed.
 
 ## API
 
-| Method | Path | Phase 1 behavior |
+| Method | Path | Behavior |
 | --- | --- | --- |
 | `GET` | `/api/health` | API and database readiness |
-| `POST` | `/api/videos/upload` | Validate and store MP4/MOV video |
+| `POST` | `/api/videos/upload` | Validate, store, and queue an MP4/MOV video |
 | `GET` | `/api/videos` | List attempts, newest first |
 | `GET` | `/api/videos/{id}` | Read attempt metadata |
-| `GET` | `/api/videos/{id}/status` | Read processing status |
+| `GET` | `/api/videos/{id}/status` | Read processing status and progress |
+| `POST` | `/api/videos/{id}/process` | Retry or rerun pose processing |
 | `GET` | `/api/videos/{id}/stream` | Stream the original video |
-| `GET` | `/api/videos/{id}/analysis` | Empty, explicit `not_started` analysis payload |
-| `GET` | `/api/videos/{id}/annotated` | `404` until Phase 2 output exists |
+| `GET` | `/api/videos/{id}/analysis` | Phase-aware analysis status; metrics remain Phase 3 |
+| `GET` | `/api/videos/{id}/annotated` | Stream the H.264 pose-overlay video when complete |
 | `GET` | `/api/sessions` | List climbing sessions and attempt counts |
 
-Upload rules are configured by `MAX_UPLOAD_SIZE_MB`. Only `.mp4` and `.mov` files with an ISO base media `ftyp` signature are accepted. Files are written through a temporary `.part` file, size-checked while streaming, and atomically renamed after validation. Client filenames are never used as storage paths.
+Upload rules are configured by `MAX_UPLOAD_SIZE_MB` and `MAX_VIDEO_DURATION_SECONDS`. Only `.mp4` and `.mov` files with an ISO base media `ftyp` signature are accepted. Files are written through a temporary `.part` file, size-checked while streaming, and atomically renamed after validation. Client filenames are never used as storage paths.
+
+Pose inference defaults to 8 FPS, one person, and the pinned MediaPipe Full float16 v1 bundle. Each sampled frame records all 33 landmark names; absent or low-presence points are stored explicitly with `detected=false` and null coordinates. The overlay keeps the source frame rate and available audio, then FFmpeg produces H.264/yuv420p output suitable for Safari and Chrome.
 
 ## Configuration
 
 Copy `.env.example` to `.env` and adjust as needed. Do not commit `.env` or real climbing videos. `CORS_ORIGINS` accepts a comma-separated list. In production, use a unique database password, serve the API behind TLS, and replace local storage with managed object storage.
 
-## Phase 1 assumptions and limitations
+## Phase 2 assumptions and limitations
 
-- MOV is a container, not a codec. A valid upload may still use a codec a particular browser cannot play; transcoding belongs in the Phase 2 worker pipeline.
+- MOV is a container, not a codec. The original may not play in every browser, but completed annotated output is transcoded to H.264.
 - A lightweight file signature check prevents renamed arbitrary files, but is not a malware scanner.
 - There is no authentication in the single-user local MVP.
-- Processing remains `uploaded`; no background worker is started in this phase.
-- Monitoring directories are reserved for Phase 4. Redis and Celery are deliberately deferred until background analysis exists.
+- One climber is tracked per video. Occluded and off-screen landmarks are retained as missing data rather than guessed.
+- The local executor is intentionally single-process. Keep the backend running until a job finishes; interrupted jobs are re-queued at the next startup.
+- Monitoring directories are reserved for Phase 4. Redis and Celery are deliberately deferred while the processing interface remains queue-compatible.
 
 ## Next phase
 
-Phase 2 will add MediaPipe Pose Landmarker, configurable frame sampling, timestamped landmark persistence, missing-landmark handling, annotated video output, and fixture-based computer-vision tests. It should preserve the upload and API contracts established here.
+Phase 3 will derive joint angles, body alignment, movement intervals, and transparent heuristic observations from the stored landmark track. Those results should include confidence and evidence timestamps and remain descriptive rather than absolute judgments of correctness.

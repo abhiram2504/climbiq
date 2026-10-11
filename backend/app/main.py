@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.services.processing_jobs import get_processing_dispatcher
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -18,10 +19,23 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    logger.info("Starting ClimbIQ API version %s", settings.app_version)
-    yield
-    logger.info("Stopping ClimbIQ API")
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    settings_provider = application.dependency_overrides.get(get_settings, get_settings)
+    dispatcher_provider = application.dependency_overrides.get(
+        get_processing_dispatcher, get_processing_dispatcher
+    )
+    active_settings = settings_provider()
+    dispatcher = dispatcher_provider()
+    logger.info("Starting ClimbIQ API version %s", active_settings.app_version)
+    try:
+        dispatcher.recover(active_settings)
+    except Exception:
+        logger.exception("Could not recover interrupted pose-processing jobs")
+    try:
+        yield
+    finally:
+        dispatcher.shutdown()
+        logger.info("Stopping ClimbIQ API")
 
 
 app = FastAPI(
