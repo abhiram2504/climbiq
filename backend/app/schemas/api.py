@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import ProcessingStatus
 
@@ -13,6 +13,27 @@ class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
     version: str
     database: Literal["connected", "unavailable"]
+
+
+class UserResponse(BaseModel):
+    id: UUID
+    email: str
+    display_name: str
+    picture_url: str | None
+
+
+class GmailConnectionResponse(BaseModel):
+    connected: bool
+    email: str | None = None
+    scopes: list[str] = Field(default_factory=list)
+    connected_at: datetime | None = None
+
+
+class AuthStatusResponse(BaseModel):
+    authenticated: bool
+    google_oauth_configured: bool
+    user: UserResponse | None = None
+    gmail: GmailConnectionResponse
 
 
 class VideoResponse(BaseModel):

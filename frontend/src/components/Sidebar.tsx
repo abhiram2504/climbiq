@@ -37,11 +37,11 @@ export function Sidebar() {
         <div className="mb-3 flex items-center justify-between">
           <Settings2 size={17} className="text-mist" aria-hidden="true" />
           <span className="rounded-full bg-lime/10 px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-lime">
-            Local
+            Account
           </span>
         </div>
-        <p className="text-sm font-bold text-chalk">Private by default</p>
-        <p className="mt-1 text-xs leading-5 text-mist">Videos stay on this machine during development.</p>
+        <p className="text-sm font-bold text-chalk">Private workspace</p>
+        <p className="mt-1 text-xs leading-5 text-mist">Your videos and sessions are isolated to your signed-in account.</p>
       </div>
     </aside>
   );

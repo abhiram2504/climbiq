@@ -58,6 +58,10 @@ input:focus-visible {
     @apply grid h-9 w-9 place-items-center rounded-lg border border-line text-mist transition hover:border-mist hover:text-chalk;
   }
 
+  .install-button {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-lime/30 bg-lime/[0.07] px-3 text-xs font-extrabold text-lime transition hover:border-lime/60 hover:bg-lime/[0.12];
+  }
+
   .mobile-nav-item {
     @apply flex items-center justify-center gap-1.5 rounded-lg border border-line px-2 py-2.5 text-xs font-bold text-mist transition hover:border-mist hover:text-chalk;
   }

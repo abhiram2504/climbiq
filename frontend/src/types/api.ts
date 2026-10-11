@@ -38,3 +38,24 @@ export interface SessionListResponse {
   items: ClimbingSession[];
   total: number;
 }
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  display_name: string;
+  picture_url: string | null;
+}
+
+export interface GmailConnection {
+  connected: boolean;
+  email: string | null;
+  scopes: string[];
+  connected_at: string | null;
+}
+
+export interface AuthStatus {
+  authenticated: boolean;
+  google_oauth_configured: boolean;
+  user: AuthUser | null;
+  gmail: GmailConnection;
+}

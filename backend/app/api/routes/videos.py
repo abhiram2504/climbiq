@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.auth.security import get_current_user
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models import (
@@ -19,6 +19,7 @@ from app.models import (
     ProcessingJob,
     ProcessingStatus,
     TechniqueObservation,
+    User,
     VideoUpload,
 )
 from app.schemas.api import (
@@ -37,8 +38,12 @@ from app.services.video_storage import InvalidVideoError, UploadTooLargeError, V
 router = APIRouter(prefix="/videos", tags=["videos"])
 
 
-def require_video(video_id: UUID, db: Session) -> VideoUpload:
-    video = db.get(VideoUpload, video_id)
+def require_video(video_id: UUID, db: Session, user: User) -> VideoUpload:
+    video = db.scalar(
+        select(VideoUpload)
+        .join(ClimbingSession)
+        .where(VideoUpload.id == video_id, ClimbingSession.user_id == user.id)
+    )
     if video is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found.")
     return video
@@ -65,23 +70,45 @@ def serialize_video(video: VideoUpload) -> VideoResponse:
     )
 
 
+def stored_video_response(
+    storage: VideoStorage,
+    storage_key: str,
+    *,
+    media_type: str,
+    filename: str | None = None,
+) -> Response:
+    signed_url = storage.signed_url(storage_key)
+    if signed_url:
+        return RedirectResponse(signed_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    path = storage.resolve(storage_key)
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Video file is unavailable.")
+    return FileResponse(path, media_type=media_type, filename=filename)
+
+
 @router.post("/upload", response_model=VideoResponse, status_code=status.HTTP_201_CREATED)
 async def upload_video(
     video: Annotated[UploadFile, File(description="MP4 or MOV climbing video")],
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
     dispatcher: Annotated[ProcessingDispatcher, Depends(get_processing_dispatcher)],
+    user: Annotated[User, Depends(get_current_user)],
     session_id: Annotated[UUID | None, Form()] = None,
     session_title: Annotated[str | None, Form(max_length=160)] = None,
 ) -> VideoResponse:
     climbing_session: ClimbingSession | None = None
     if session_id is not None:
-        climbing_session = db.get(ClimbingSession, session_id)
+        climbing_session = db.scalar(
+            select(ClimbingSession).where(
+                ClimbingSession.id == session_id,
+                ClimbingSession.user_id == user.id,
+            )
+        )
         if climbing_session is None:
             raise HTTPException(status_code=404, detail="Climbing session not found.")
 
     video_id = uuid4()
-    storage = VideoStorage(settings.video_storage_path, settings.max_upload_size_bytes)
+    storage = VideoStorage.from_settings(settings)
     try:
         storage_key, size_bytes, original_name = await storage.save(video, video_id)
     except UploadTooLargeError as exc:
@@ -93,7 +120,7 @@ async def upload_video(
 
     if climbing_session is None:
         title = (session_title or "").strip() or f"Session · {datetime.now(UTC):%b %d, %Y}"
-        climbing_session = ClimbingSession(title=title)
+        climbing_session = ClimbingSession(title=title, user_id=user.id)
         db.add(climbing_session)
         db.flush()
 
@@ -129,22 +156,36 @@ async def upload_video(
 
 
 @router.get("", response_model=VideoListResponse)
-def list_videos(db: Annotated[Session, Depends(get_db)]) -> VideoListResponse:
-    videos = db.scalars(select(VideoUpload).order_by(VideoUpload.created_at.desc())).all()
+def list_videos(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> VideoListResponse:
+    videos = db.scalars(
+        select(VideoUpload)
+        .join(ClimbingSession)
+        .where(ClimbingSession.user_id == user.id)
+        .order_by(VideoUpload.created_at.desc())
+    ).all()
     items = [serialize_video(video) for video in videos]
     return VideoListResponse(items=items, total=len(items))
 
 
 @router.get("/{video_id}", response_model=VideoResponse)
-def get_video(video_id: UUID, db: Annotated[Session, Depends(get_db)]) -> VideoResponse:
-    return serialize_video(require_video(video_id, db))
+def get_video(
+    video_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> VideoResponse:
+    return serialize_video(require_video(video_id, db, user))
 
 
 @router.get("/{video_id}/status", response_model=VideoStatusResponse)
 def get_video_status(
-    video_id: UUID, db: Annotated[Session, Depends(get_db)]
+    video_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> VideoStatusResponse:
-    video = require_video(video_id, db)
+    video = require_video(video_id, db, user)
     job = db.scalar(
         select(ProcessingJob)
         .where(ProcessingJob.video_id == video.id)
@@ -177,8 +218,9 @@ def process_video(
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
     dispatcher: Annotated[ProcessingDispatcher, Depends(get_processing_dispatcher)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> VideoResponse:
-    video = require_video(video_id, db)
+    video = require_video(video_id, db, user)
     if video.status in {ProcessingStatus.queued, ProcessingStatus.processing}:
         raise HTTPException(status_code=409, detail="Video processing is already in progress.")
 
@@ -203,18 +245,25 @@ def stream_video(
     video_id: UUID,
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> FileResponse:
-    video = require_video(video_id, db)
-    storage = VideoStorage(settings.video_storage_path, settings.max_upload_size_bytes)
-    path = storage.resolve(video.storage_key)
-    if not path.is_file():
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Video file is unavailable.")
-    return FileResponse(path, media_type=video.content_type, filename=video.original_filename)
+    user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    video = require_video(video_id, db, user)
+    storage = VideoStorage.from_settings(settings)
+    return stored_video_response(
+        storage,
+        video.storage_key,
+        media_type=video.content_type,
+        filename=video.original_filename,
+    )
 
 
 @router.get("/{video_id}/analysis", response_model=AnalysisResponse)
-def get_analysis(video_id: UUID, db: Annotated[Session, Depends(get_db)]) -> AnalysisResponse:
-    video = require_video(video_id, db)
+def get_analysis(
+    video_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> AnalysisResponse:
+    video = require_video(video_id, db, user)
     metrics = db.scalars(
         select(MovementMetric)
         .where(MovementMetric.video_id == video_id)
@@ -249,17 +298,17 @@ def get_annotated_video(
     video_id: UUID,
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> FileResponse:
-    video = require_video(video_id, db)
+    user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    video = require_video(video_id, db, user)
     if not video.annotated_storage_key:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Annotated video is not available yet.",
         )
-    storage = VideoStorage(settings.video_storage_path, settings.max_upload_size_bytes)
-    path: Path = storage.resolve(video.annotated_storage_key)
-    if not path.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE, detail="Annotated video is unavailable."
-        )
-    return FileResponse(path, media_type="video/mp4")
+    storage = VideoStorage.from_settings(settings)
+    return stored_video_response(
+        storage,
+        video.annotated_storage_key,
+        media_type="video/mp4",
+    )

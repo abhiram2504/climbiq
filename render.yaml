@@ -1,0 +1,130 @@
+services:
+  - type: web
+    name: climbiq-web
+    runtime: docker
+    plan: 0.5c-512mb
+    region: oregon
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    healthCheckPath: /
+    envVars:
+      - key: API_UPSTREAM
+        fromService:
+          type: pserv
+          name: climbiq-api
+          property: hostport
+
+  - type: pserv
+    name: climbiq-api
+    runtime: docker
+    plan: 1c-2g
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+    preDeployCommand: alembic upgrade head
+    maxShutdownDelaySeconds: 300
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SERVICE_ROLE
+        value: api
+      - key: DATABASE_URL
+        fromDatabase:
+          name: climbiq-db
+          property: connectionString
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_SIGNED_URL_SECONDS
+        value: 900
+      - key: CORS_ORIGINS
+        sync: false
+      - key: TRUSTED_HOSTS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: AUTH_REQUIRED
+        value: true
+      - key: AUTH_ALLOWED_EMAILS
+        sync: false
+      - key: AUTH_COOKIE_SECURE
+        value: true
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: MAX_UPLOAD_SIZE_MB
+        value: 250
+      - key: MAX_VIDEO_DURATION_SECONDS
+        value: 600
+      - key: PROCESSING_MODE
+        value: database
+      - key: LOG_LEVEL
+        value: INFO
+
+  - type: worker
+    name: climbiq-worker
+    runtime: docker
+    plan: 1c-2g
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: python -m app.worker
+    maxShutdownDelaySeconds: 300
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SERVICE_ROLE
+        value: worker
+      - key: DATABASE_URL
+        fromDatabase:
+          name: climbiq-db
+          property: connectionString
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: PROCESSING_MODE
+        value: database
+      - key: WORKER_POLL_SECONDS
+        value: 2
+      - key: WORKER_STALE_SECONDS
+        value: 3600
+      - key: WORKER_MAX_ATTEMPTS
+        value: 3
+      - key: MAX_UPLOAD_SIZE_MB
+        value: 250
+      - key: MAX_VIDEO_DURATION_SECONDS
+        value: 600
+      - key: LOG_LEVEL
+        value: INFO
+
+databases:
+  - name: climbiq-db
+    plan: 0.1c-256mb
+    region: oregon
+    databaseName: climbiq
+    user: climbiq
+    ipAllowList: []

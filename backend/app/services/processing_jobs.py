@@ -67,6 +67,7 @@ class LocalProcessingDispatcher:
         max_workers: int,
     ) -> None:
         self._session_factory = session_factory
+        self._runner = PoseJobRunner(session_factory)
         self._executor = ThreadPoolExecutor(
             max_workers=max_workers,
             thread_name_prefix="climbiq-pose",
@@ -88,7 +89,7 @@ class LocalProcessingDispatcher:
                 return
             self._in_flight.add(job_id)
 
-        future = self._executor.submit(self._run_job, video_id, job_id, settings)
+        future = self._executor.submit(self._runner.run, video_id, job_id, settings)
         future.add_done_callback(lambda completed: self._job_finished(job_id, completed))
 
     def recover(self, settings: Settings) -> None:
@@ -143,10 +144,13 @@ class LocalProcessingDispatcher:
                 exc_info=(type(exception), exception, exception.__traceback__),
             )
 
-    def _run_job(self, video_id: UUID, job_id: UUID, settings: Settings) -> None:
-        storage = VideoStorage(settings.video_storage_path, settings.max_upload_size_bytes)
+class PoseJobRunner:
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+        self._session_factory = session_factory
+
+    def run(self, video_id: UUID, job_id: UUID, settings: Settings) -> None:
+        storage = VideoStorage.from_settings(settings)
         annotated_key = f"{video_id}.{job_id}.annotated.mp4"
-        annotated_path = storage.resolve(annotated_key)
         previous_annotated_key: str | None = None
 
         try:
@@ -168,10 +172,6 @@ class LocalProcessingDispatcher:
                 job.error_message = None
                 db.commit()
 
-                source_path = storage.resolve(video.storage_key)
-                if not source_path.is_file():
-                    raise FileNotFoundError("The uploaded video file is unavailable.")
-
                 last_progress = -1
 
                 def update_progress(current: int, total: int) -> None:
@@ -184,11 +184,15 @@ class LocalProcessingDispatcher:
                     job.progress_total = total
                     db.commit()
 
-                result = VideoPoseProcessor(settings).process(
-                    source_path,
-                    annotated_path,
-                    progress_callback=update_progress,
-                )
+                with (
+                    storage.materialize(video.storage_key) as source_path,
+                    storage.output(annotated_key) as annotated_path,
+                ):
+                    result = VideoPoseProcessor(settings).process(
+                        source_path,
+                        annotated_path,
+                        progress_callback=update_progress,
+                    )
 
                 db.execute(delete(PoseLandmark).where(PoseLandmark.video_id == video_id))
                 rows = [
@@ -240,7 +244,12 @@ class LocalProcessingDispatcher:
                 len(result.samples),
             )
         except Exception as exc:
-            annotated_path.unlink(missing_ok=True)
+            try:
+                storage.delete(annotated_key)
+            except Exception:
+                logger.warning(
+                    "Could not remove failed annotation %s", annotated_key, exc_info=True
+                )
             error_message = self._safe_error(exc)
             logger.exception("Pose job %s failed for video %s", job_id, video_id)
             with self._session_factory() as db:
@@ -261,7 +270,26 @@ class LocalProcessingDispatcher:
         return message[:1_000]
 
 
-_dispatcher: LocalProcessingDispatcher | None = None
+class DatabaseQueueDispatcher:
+    def __init__(self) -> None:
+        self._closed = False
+
+    @property
+    def is_closed(self) -> bool:
+        return self._closed
+
+    def enqueue(self, video_id: UUID, job_id: UUID, settings: Settings) -> None:
+        if self._closed:
+            raise RuntimeError("The processing dispatcher is shutting down.")
+
+    def recover(self, settings: Settings) -> None:
+        return None
+
+    def shutdown(self) -> None:
+        self._closed = True
+
+
+_dispatcher: LocalProcessingDispatcher | DatabaseQueueDispatcher | None = None
 _dispatcher_lock = Lock()
 
 
@@ -270,5 +298,8 @@ def get_processing_dispatcher() -> ProcessingDispatcher:
     with _dispatcher_lock:
         if _dispatcher is None or _dispatcher.is_closed:
             settings = get_settings()
-            _dispatcher = LocalProcessingDispatcher(SessionLocal, settings.processing_workers)
+            if settings.processing_mode == "database":
+                _dispatcher = DatabaseQueueDispatcher()
+            else:
+                _dispatcher = LocalProcessingDispatcher(SessionLocal, settings.processing_workers)
         return _dispatcher
