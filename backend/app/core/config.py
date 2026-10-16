@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = "ClimbIQ API"
-    app_version: str = "0.3.0"
+    app_version: str = "0.4.0"
     environment: Literal["development", "test", "production"] = "development"
     service_role: Literal["api", "worker"] = "api"
     database_url: str = "postgresql+psycopg://climbiq:climbiq@localhost:5432/climbiq"

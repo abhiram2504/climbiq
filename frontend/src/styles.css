@@ -23,12 +23,16 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: 2px solid #c8ff3d;
   outline-offset: 2px;
 }
@@ -79,11 +83,51 @@ input:focus-visible {
   }
 
   .button-secondary {
-    @apply inline-flex items-center justify-center rounded-lg border border-line bg-white/[0.025] px-4 py-2.5 text-xs font-bold text-chalk transition hover:border-mist hover:bg-white/[0.05];
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-white/[0.025] px-4 py-2.5 text-xs font-bold text-chalk transition hover:border-mist hover:bg-white/[0.05] disabled:cursor-wait disabled:opacity-60;
   }
 
   .field {
     @apply w-full rounded-xl border border-line bg-ink px-3.5 py-3 text-sm text-chalk placeholder:text-mist/60;
+  }
+
+  .field-label {
+    @apply text-[10px] font-extrabold uppercase tracking-[0.15em] text-mist;
+  }
+
+  .segment-button {
+    @apply flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-extrabold text-mist transition hover:text-chalk;
+  }
+
+  .segment-button-active {
+    @apply bg-panel text-chalk shadow-sm;
+  }
+
+  .filter-button {
+    @apply rounded-md px-3 py-2 text-[10px] font-extrabold uppercase tracking-wider text-mist transition hover:text-chalk;
+  }
+
+  .filter-button-active {
+    @apply bg-panel text-chalk;
+  }
+
+  .grade-pill {
+    @apply inline-flex rounded-md bg-white/[0.065] px-2 py-1 text-[10px] font-extrabold text-chalk;
+  }
+
+  .result-pill {
+    @apply inline-flex rounded-full border px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider;
+  }
+
+  .result-send {
+    @apply border-lime/20 bg-lime/[0.07] text-lime;
+  }
+
+  .result-attempt {
+    @apply border-amber-300/20 bg-amber-300/[0.06] text-amber-200;
+  }
+
+  .benchmark-pill {
+    @apply inline-flex rounded-full border border-sky-300/20 bg-sky-300/[0.06] px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-sky-200;
   }
 
   .status-pill {

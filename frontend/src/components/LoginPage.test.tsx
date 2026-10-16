@@ -10,7 +10,7 @@ describe("LoginPage", () => {
       "href",
       "/api/auth/google/login",
     );
-    expect(screen.getByText(/gmail access is optional/i)).toBeInTheDocument();
+    expect(screen.getByText(/imported without sharing provider passwords/i)).toBeInTheDocument();
   });
 
   it("shows setup guidance when Google OAuth is not configured", () => {

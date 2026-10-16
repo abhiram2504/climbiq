@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import enum
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     Enum,
     Float,
@@ -33,6 +34,28 @@ class ProcessingStatus(enum.StrEnum):
     failed = "failed"
 
 
+class ClimbSource(enum.StrEnum):
+    manual = "manual"
+    mountain_project = "mountain_project"
+    moonboard = "moonboard"
+
+
+class ClimbDiscipline(enum.StrEnum):
+    outdoor = "outdoor"
+    moonboard = "moonboard"
+
+
+class ClimbOutcome(enum.StrEnum):
+    attempt = "attempt"
+    send = "send"
+
+
+class ProjectStatus(enum.StrEnum):
+    active = "active"
+    sent = "sent"
+    archived = "archived"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -53,6 +76,15 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
     climbing_sessions: Mapped[list[ClimbingSession]] = relationship(back_populates="user")
+    climbs: Mapped[list[Climb]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    logbook_entries: Mapped[list[ClimbLogEntry]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    climbing_projects: Mapped[list[ClimbingProject]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class AuthSession(Base):
@@ -122,6 +154,139 @@ class ClimbingSession(Base):
         back_populates="session", cascade="all, delete-orphan"
     )
     user: Mapped[User | None] = relationship(back_populates="climbing_sessions")
+
+
+class Climb(Base):
+    __tablename__ = "climbs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "identity_key", name="uq_climbs_user_identity"),
+        Index("ix_climbs_user_discipline", "user_id", "discipline"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    identity_key: Mapped[str] = mapped_column(String(64))
+    source: Mapped[ClimbSource] = mapped_column(
+        Enum(ClimbSource, native_enum=False, length=32), index=True
+    )
+    discipline: Mapped[ClimbDiscipline] = mapped_column(
+        Enum(ClimbDiscipline, native_enum=False, length=32), index=True
+    )
+    external_id: Mapped[str | None] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    grade: Mapped[str] = mapped_column(String(32))
+    grade_system: Mapped[str | None] = mapped_column(String(32))
+    location: Mapped[str | None] = mapped_column(String(500))
+    route_type: Mapped[str | None] = mapped_column(String(100))
+    external_url: Mapped[str | None] = mapped_column(String(1000))
+    pitches: Mapped[int | None] = mapped_column(Integer)
+    length_ft: Mapped[int | None] = mapped_column(Integer)
+    board_name: Mapped[str | None] = mapped_column(String(100))
+    board_angle: Mapped[int | None] = mapped_column(Integer)
+    setter: Mapped[str | None] = mapped_column(String(160))
+    is_benchmark: Mapped[bool] = mapped_column(Boolean, default=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="climbs")
+    logbook_entries: Mapped[list[ClimbLogEntry]] = relationship(
+        back_populates="climb", cascade="all, delete-orphan"
+    )
+    target_projects: Mapped[list[ClimbingProject]] = relationship(back_populates="target_climb")
+    project_drills: Mapped[list[ProjectDrill]] = relationship(back_populates="climb")
+
+
+class ClimbingProject(Base):
+    __tablename__ = "climbing_projects"
+    __table_args__ = (Index("ix_projects_user_status", "user_id", "status"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    target_climb_id: Mapped[UUID] = mapped_column(
+        ForeignKey("climbs.id", ondelete="RESTRICT"), index=True
+    )
+    status: Mapped[ProjectStatus] = mapped_column(
+        Enum(ProjectStatus, native_enum=False, length=16),
+        default=ProjectStatus.active,
+        index=True,
+    )
+    demand_tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="climbing_projects")
+    target_climb: Mapped[Climb] = relationship(back_populates="target_projects")
+    drills: Mapped[list[ProjectDrill]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    logbook_entries: Mapped[list[ClimbLogEntry]] = relationship(back_populates="project")
+
+
+class ProjectDrill(Base):
+    __tablename__ = "project_drills"
+    __table_args__ = (
+        UniqueConstraint("project_id", "climb_id", name="uq_project_drill_climb"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("climbing_projects.id", ondelete="CASCADE"), index=True
+    )
+    climb_id: Mapped[UUID] = mapped_column(
+        ForeignKey("climbs.id", ondelete="RESTRICT"), index=True
+    )
+    focus: Mapped[str | None] = mapped_column(String(160))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    project: Mapped[ClimbingProject] = relationship(back_populates="drills")
+    climb: Mapped[Climb] = relationship(back_populates="project_drills")
+
+
+class ClimbLogEntry(Base):
+    __tablename__ = "climb_log_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "source_entry_key", name="uq_logbook_user_source_entry"),
+        Index("ix_logbook_user_date", "user_id", "climbed_on"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    climb_id: Mapped[UUID] = mapped_column(
+        ForeignKey("climbs.id", ondelete="CASCADE"), index=True
+    )
+    project_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("climbing_projects.id", ondelete="SET NULL"), index=True
+    )
+    climbed_on: Mapped[date] = mapped_column(Date, index=True)
+    outcome: Mapped[ClimbOutcome] = mapped_column(
+        Enum(ClimbOutcome, native_enum=False, length=16), index=True
+    )
+    ascent_type: Mapped[str | None] = mapped_column(String(32))
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    rating: Mapped[float | None] = mapped_column(Float)
+    notes: Mapped[str | None] = mapped_column(Text)
+    import_source: Mapped[str | None] = mapped_column(String(64))
+    source_entry_key: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="logbook_entries")
+    climb: Mapped[Climb] = relationship(back_populates="logbook_entries")
+    project: Mapped[ClimbingProject | None] = relationship(back_populates="logbook_entries")
 
 
 class VideoUpload(Base):

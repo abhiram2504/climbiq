@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "climbiq-backend"
-version = "0.3.0"
-description = "ClimbIQ video ingestion and climbing analysis API"
+version = "0.4.0"
+description = "ClimbIQ outdoor and board-climbing logbook API"
 readme = "README.docker.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [

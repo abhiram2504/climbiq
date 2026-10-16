@@ -12,9 +12,9 @@ export default defineConfig(({ mode }) => {
         registerType: "prompt",
         includeAssets: ["favicon.svg", "icons/apple-touch-icon.png"],
         manifest: {
-          name: "ClimbIQ · Movement Lab",
+          name: "ClimbIQ · Climbing Logbook",
           short_name: "ClimbIQ",
-          description: "Measured movement analysis for indoor bouldering.",
+          description: "One progress log for outdoor climbing and MoonBoard sessions.",
           theme_color: "#0d0f0f",
           background_color: "#0d0f0f",
           display: "standalone",

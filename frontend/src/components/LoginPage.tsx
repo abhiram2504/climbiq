@@ -1,4 +1,4 @@
-import { ArrowRight, Check, LockKeyhole, Mail, RefreshCw } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Check, LockKeyhole, RefreshCw } from "lucide-react";
 import { authRedirectUrl } from "../services/api";
 import { Brand } from "./Brand";
 
@@ -27,17 +27,17 @@ export function LoginPage({ configured, error, serverUnavailable = false, onRetr
       <section className="relative flex min-h-[46vh] flex-col justify-between border-b border-line p-7 sm:p-10 lg:min-h-screen lg:border-b-0 lg:border-r lg:p-14">
         <Brand />
         <div className="my-14 max-w-2xl lg:my-0">
-          <p className="eyebrow text-lime">Your private movement lab</p>
+          <p className="eyebrow text-lime">Your climbing history</p>
           <h1 className="mt-5 max-w-xl text-5xl font-extrabold leading-[0.98] tracking-[-0.065em] sm:text-6xl">
-            See the climb.<br />Understand the movement.
+            Outside or on the board.<br />It all counts.
           </h1>
           <p className="mt-6 max-w-lg text-base leading-7 text-mist">
-            Analyze bouldering attempts with measured pose overlays and keep every session tied securely to your account.
+            Keep outdoor routes, MoonBoard attempts, sends, projects, and progress together in one durable logbook.
           </p>
         </div>
         <div className="hidden items-center gap-6 text-xs font-bold uppercase tracking-[0.14em] text-mist sm:flex">
           <span className="flex items-center gap-2"><Check size={14} className="text-lime" /> Private workspace</span>
-          <span className="flex items-center gap-2"><Check size={14} className="text-lime" /> Read-only Gmail</span>
+          <span className="flex items-center gap-2"><Check size={14} className="text-lime" /> Portable history</span>
         </div>
       </section>
 
@@ -51,8 +51,8 @@ export function LoginPage({ configured, error, serverUnavailable = false, onRetr
           </h2>
           <p className="mt-2 text-sm leading-6 text-mist">
             {serverUnavailable
-              ? "ClimbIQ could not reach the analysis server. Your saved sessions are unaffected."
-              : "Sign in with Google to open your training workspace."}
+              ? "ClimbIQ could not reach the logbook server. Your saved history is unaffected."
+              : "Sign in with Google to open your climbing logbook."}
           </p>
 
           {error && <div className="mt-5 rounded-xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-200" role="alert">{error}</div>}
@@ -91,8 +91,8 @@ export function LoginPage({ configured, error, serverUnavailable = false, onRetr
           )}
 
           {!serverUnavailable && <div className="mt-7 flex gap-3 border-t border-line pt-6 text-xs leading-5 text-mist">
-            <Mail size={17} className="mt-0.5 shrink-0 text-lime" />
-            <p>Gmail access is optional and requested separately after sign-in. ClimbIQ asks for read-only access and never requests permission to send or delete mail.</p>
+            <BookOpenCheck size={17} className="mt-0.5 shrink-0 text-lime" />
+            <p>Your outdoor and board records are isolated to your account and can be imported without sharing provider passwords.</p>
           </div>}
         </div>
       </section>

@@ -43,7 +43,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="Local-first video ingestion and climbing movement analysis API.",
+    description="Account-based outdoor and board-climbing logbook API.",
     lifespan=lifespan,
     docs_url=None if settings.environment == "production" else "/docs",
     redoc_url=None if settings.environment == "production" else "/redoc",

@@ -1,15 +1,13 @@
-import { ChevronDown, LogOut, Mail, Unplug } from "lucide-react";
+import { ChevronDown, LogOut } from "lucide-react";
 import { useState } from "react";
-import { authRedirectUrl } from "../services/api";
 import type { AuthStatus } from "../types/api";
 
 interface AccountMenuProps {
   auth: AuthStatus;
   onLogout: () => Promise<void>;
-  onDisconnectGmail: () => Promise<void>;
 }
 
-export function AccountMenu({ auth, onLogout, onDisconnectGmail }: AccountMenuProps) {
+export function AccountMenu({ auth, onLogout }: AccountMenuProps) {
   const [open, setOpen] = useState(false);
   const [working, setWorking] = useState(false);
   const user = auth.user!;
@@ -43,21 +41,6 @@ export function AccountMenu({ auth, onLogout, onDisconnectGmail }: AccountMenuPr
             <p className="truncate text-sm font-extrabold text-chalk">{user.display_name}</p>
             <p className="mt-1 truncate text-xs text-mist">{user.email}</p>
           </div>
-          {auth.google_oauth_configured && <div className="rounded-xl border border-line bg-ink/60 p-3">
-            <div className="flex items-start gap-3">
-              <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${auth.gmail.connected ? "bg-lime/10 text-lime" : "bg-white/5 text-mist"}`}><Mail size={17} /></div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-extrabold text-chalk">Gmail</p>
-                <p className="mt-1 truncate text-[11px] text-mist">{auth.gmail.connected ? auth.gmail.email : "Not connected"}</p>
-              </div>
-              <span className={`mt-1 h-2 w-2 rounded-full ${auth.gmail.connected ? "bg-lime" : "bg-mist/40"}`} />
-            </div>
-            {auth.gmail.connected ? (
-              <button disabled={working} type="button" className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-bold text-mist transition hover:text-chalk disabled:opacity-50" onClick={() => void run(onDisconnectGmail)}><Unplug size={14} /> Disconnect Gmail</button>
-            ) : (
-              <a className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-lime px-3 py-2 text-xs font-extrabold text-ink transition hover:bg-[#d8ff78]" href={authRedirectUrl("/gmail/connect")}><Mail size={14} /> Connect Gmail</a>
-            )}
-          </div>}
           {auth.google_oauth_configured && <button disabled={working} type="button" className="mt-2 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold text-mist transition hover:bg-white/[0.04] hover:text-chalk disabled:opacity-50" onClick={() => void run(onLogout)}><LogOut size={14} /> Sign out</button>}
         </div>
       )}
