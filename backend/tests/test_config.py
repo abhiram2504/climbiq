@@ -64,3 +64,23 @@ def test_production_worker_requires_durable_queue_and_storage() -> None:
 
     with pytest.raises(ValidationError, match="PROCESSING_MODE"):
         Settings(_env_file=None, environment="production", service_role="worker")
+
+
+def test_logbook_only_production_does_not_require_video_infrastructure() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="production",
+        video_analysis_enabled=False,
+        google_client_id="client-id",
+        google_client_secret="client-secret",
+        auth_required=True,
+        auth_allowed_emails="climber@example.com",
+        auth_cookie_secure=True,
+        frontend_url="https://climbiq.example",
+        google_redirect_uri="https://climbiq.example/api/auth/google/callback",
+        token_encryption_key="a-production-secret-that-is-long-enough",
+    )
+
+    assert settings.video_analysis_enabled is False
+    assert settings.storage_backend == "local"
+    assert settings.processing_mode == "local"

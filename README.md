@@ -62,7 +62,7 @@ docker compose up -d postgres
 cd backend
 python3.12 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[dev]'
+python -m pip install -e '.[dev,video]'
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
@@ -100,6 +100,15 @@ The importer expects Mountain Project's current 15-column tick export and caps u
 ```
 
 This runs backend tests and linting plus frontend tests, type checking, and the production PWA build.
+
+## Deploy on Vercel
+
+The repository includes a two-service Vercel configuration for the current logbook product. It
+serves the Vite PWA at `/` and FastAPI at `/api/*` on one origin. The legacy pose-analysis worker
+is intentionally excluded from this deployment.
+
+See [`docs/vercel.md`](docs/vercel.md) for the database, OAuth, environment-variable, migration,
+and release steps.
 
 ## Next product slice
 

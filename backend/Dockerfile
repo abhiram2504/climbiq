@@ -21,7 +21,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.docker.md ./
-RUN python -m pip install --upgrade pip && python -m pip install .
+RUN python -m pip install --upgrade pip && python -m pip install '.[video]'
 
 COPY alembic.ini ./
 COPY alembic ./alembic

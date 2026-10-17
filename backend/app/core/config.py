@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     app_version: str = "0.4.0"
     environment: Literal["development", "test", "production"] = "development"
     service_role: Literal["api", "worker"] = "api"
+    video_analysis_enabled: bool = True
     database_url: str = "postgresql+psycopg://climbiq:climbiq@localhost:5432/climbiq"
     storage_backend: Literal["local", "s3"] = "local"
     video_storage_path: Path = Path("./data/videos")
@@ -115,10 +116,13 @@ class Settings(BaseSettings):
             or len(self.token_encryption_key) < 32
         ):
             raise ValueError("TOKEN_ENCRYPTION_KEY must be a strong production secret.")
-        if self.storage_backend != "s3":
-            raise ValueError("Production APIs require STORAGE_BACKEND=s3.")
-        if self.processing_mode != "database":
-            raise ValueError("Production APIs require PROCESSING_MODE=database.")
+        if self.video_analysis_enabled:
+            if self.storage_backend != "s3":
+                raise ValueError("Production APIs with video analysis require STORAGE_BACKEND=s3.")
+            if self.processing_mode != "database":
+                raise ValueError(
+                    "Production APIs with video analysis require PROCESSING_MODE=database."
+                )
         return self
 
     @property
